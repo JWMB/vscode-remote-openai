@@ -1,6 +1,17 @@
 <html>
     <head>
         <title>VS Code Rocks!</title>
+        <script>
+            function submit() {
+                fetch("/prompt?", new URLSearchParams({
+                    prompt: document.getElementById("prompt").value,
+                    interfaceBaseUrl: document.getElementById("interfaceBaseUrl").value,
+                    modelName: document.getElementById("modelName").value,
+                }))
+                .then(r => console.log(r))
+                .catch(err => console.error(err))
+            }
+        </script>
     </head>
     <body>
         OpenAI model name: <input id="modelName" type="text" value="text-davinci-003" />
