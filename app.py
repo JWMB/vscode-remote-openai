@@ -13,15 +13,19 @@ from langchain.llms import OpenAI
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.docstore.document import Document
 
-def constructUrl(baseUrl, path):
+def constructUrl(baseUrl, path, categories=""):
     clientId = "c196d990-f964-457f-5690-552e7a52600c"
     # baseUrl = "https://acehelphub.humany.net/ace-help-hub-86/"
     site = "%2F%2Fopen-ai-testbed"
     funnel = "open-ai-testbed" #"ace-help-hub-86"
-    return baseUrl + path + "?client=" + clientId + "&funnel=" + funnel + "&site=" + site
+    qCat = ""
+    if len(categories) > 0:
+        qCat = "&categories=" + categories
 
-def constructQueryUrl(phrase, interfaceBaseUrl):
-    return constructUrl(interfaceBaseUrl, "guides") + "&phrase=" + urllib.parse.quote(phrase) + "&skip=0&take=6&sorting.type=popularity&sorting.direction=descending"
+    return baseUrl + path + "?client=" + clientId + "&funnel=" + funnel + "&site=" + site + qCat
+
+def constructQueryUrl(phrase, interfaceBaseUrl, categories):
+    return constructUrl(interfaceBaseUrl, "guides", categories) + "&phrase=" + urllib.parse.quote(phrase) + "&skip=0&take=6&sorting.type=popularity&sorting.direction=descending"
 def constructGuideUrl(guideId, interfaceBaseUrl):
     return constructUrl(interfaceBaseUrl, "guides/" + guideId)
 
@@ -33,9 +37,13 @@ def getArticle(id, interfaceBaseUrl):
     # sources.append(resp["Title"] + " \n" + body)
     return { "title": resp["Title"], "page_content": body, "metadata": {"source": url} }
 
-def getRelevantSources(phrase, interfaceBaseUrl):
-    x = requests.post(constructQueryUrl(phrase, interfaceBaseUrl))
+def getRelevantSources(phrase, interfaceBaseUrl, categories):
+    qUrl = constructQueryUrl(phrase, interfaceBaseUrl, categories)
+    x = requests.post(qUrl)
 
+    if x.status_code != 200:
+        raise "Knowledge request error: " + x.reason
+    
     totalLen = 0
     sources = []
     for match in x.json()["Matches"]:
@@ -47,7 +55,7 @@ def getRelevantSources(phrase, interfaceBaseUrl):
         article = getArticle(id, interfaceBaseUrl)
         content = article["page_content"]
         totalLen += len(content)
-        if totalLen > 4000 / 1.4:
+        if totalLen > 4000 / 1.1:
             break
         else:
             sources.append(Document(
@@ -57,10 +65,10 @@ def getRelevantSources(phrase, interfaceBaseUrl):
     )
     return sources
 
-def createAnswer(question, openAiApiKey, modelName, interfaceBaseUrl):
-    sources = getRelevantSources(question, interfaceBaseUrl)
+def createAnswer(question, openAiApiKey, modelName, interfaceBaseUrl, categories, temperature):
+    sources = getRelevantSources(question, interfaceBaseUrl, categories)
     chain = load_qa_with_sources_chain(
-        OpenAI(temperature=0, openai_api_key=openAiApiKey,
+        OpenAI(temperature=temperature, openai_api_key=openAiApiKey,
         model_name=modelName # "text-davinci-003" # https://platform.openai.com/docs/models
         )
         # max_tokens=256 # sets an upper bound on how many tokens the API will return
@@ -90,8 +98,10 @@ def prompt():
     modelName = request.args.get("modelName")
     interfaceBaseUrl = request.args.get("interfaceBaseUrl")
     openAiApiKey = request.args.get("openAiApiKey")
+    temperature = request.args.get("temperature")
+    categories = request.args.get("categories")
     if not(rPrompt is None) and len(rPrompt):
-        answer = createAnswer(rPrompt, openAiApiKey, modelName, interfaceBaseUrl)
+        answer = createAnswer(rPrompt, openAiApiKey, modelName, interfaceBaseUrl, categories, float(temperature))
         response = make_response(answer, 200)
     else:
         response = make_response("prompt parameter empty", 200)
