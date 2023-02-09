@@ -3,20 +3,31 @@
         <title>VS Code Rocks!</title>
         <script>
             function submit() {
-                fetch("/prompt?", new URLSearchParams({
+                fetch("/prompt?" + new URLSearchParams({
                     prompt: document.getElementById("prompt").value,
                     interfaceBaseUrl: document.getElementById("interfaceBaseUrl").value,
                     modelName: document.getElementById("modelName").value,
+                    openAiApiKey: document.getElementById("openAiApiKey").value,
                 }))
-                .then(r => console.log(r))
+                .then(r => { 
+                    console.log(r);
+                    r.text().then(txt => document.getElementById('response').value = txt)
+                })
                 .catch(err => console.error(err))
             }
         </script>
     </head>
     <body>
-        OpenAI model name: <input id="modelName" type="text" value="text-davinci-003" />
-        Interface baseUrl: <input id="interfaceBaseUrl" type="text" value="https://acehelphub.humany.net/ace-help-hub-86/" />
-        Prompt: <input id="prompt" type="text" value="" placeholder="What is a guide?" />
-        <input type="button" value="Submit" />
+        <input id="openAiApiKey" type="text" value="" /> OpenAI API key !!REQUIRED!! <a href="https://platform.openai.com/account/api-keys">Get here</a>
+        <br/>
+        <input id="modelName" type="text" value="text-davinci-003" /> OpenAI model name
+        <br/>
+        <input id="interfaceBaseUrl" type="text" value="https://acehelphub.humany.net/ace-help-hub-86/" /> Interface baseUrl
+        <br/>
+        <input id="prompt" type="text" value="What is a guide?" /> Prompt
+        <br/>
+        <input type="button" value="Submit" onclick="submit()" />
+        <br/>
+        <textarea cols="80" rows="10" id="response"></textarea>
     </body>
 </html>
