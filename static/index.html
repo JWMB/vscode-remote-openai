@@ -18,11 +18,13 @@
                 .catch(err => console.error(err))
             }
             function submit2() {
-                fetch("/step2?" + new URLSearchParams({
+                const endpoint = document.getElementById('serviceType').value == "chatgpt" ? "stepChatGpt" : "step2";
+                fetch("/" + endpoint + "?" + new URLSearchParams({
                     prompt: document.getElementById("prompt").value,
                     // interfaceBaseUrl: document.getElementById("interfaceBaseUrl").value,
                     modelName: document.getElementById("modelName").value,
                     openAiApiKey: document.getElementById("openAiApiKey").value,
+                    azureOpenAiApiKey: document.getElementById("azureOpenAiApiKey").value,
                     temperature: document.getElementById("temperature").value,
                     // categories: document.getElementById("categories").value,
                 }), { 
@@ -40,15 +42,9 @@
         </script>
     </head>
     <body>
-        <input id="openAiApiKey" type="text" value="" /> OpenAI API key !!REQUIRED!! <a href="https://platform.openai.com/account/api-keys">Get here</a>
-        <br/>
-        <input id="modelName" type="text" value="text-davinci-003" /> OpenAI model name
-        <br/>
         <input id="interfaceBaseUrl" type="text" value="https://acehelphub.humany.net/ace-help-hub-86/" /> Interface baseUrl
         <br/>
         <input id="categories" type="text" value="" /> Specific subcategory id(s)
-        <br/>
-        <input id="temperature" type="number" value="0" /> OpenAI temperature
         <br/>
         <input id="prompt" type="text" value="What is a guide?" /> Prompt
         <br/>
@@ -56,6 +52,21 @@
         <br/>
         <textarea cols="80" rows="10" id="response"></textarea>
         <br/>
+        !!REQUIRED!!
+        <br/>
+        <input id="openAiApiKey" type="text" value="sk-" /> OpenAI API key <a href="https://platform.openai.com/account/api-keys">Get here</a>
+        <br/>
+        <input id="azureOpenAiApiKey" type="text" value="..." /> Azure OpenAI API key
+        <br/>
+        <br/>
+        <input id="modelName" type="text" value="text-davinci-003" /> OpenAI model name
+        <br/>
+        <input id="temperature" type="number" value="0" /> OpenAI temperature
+        <br/>
+        <select id="serviceType">
+            <option value="chatgpt">ChatGPT (OpenAI)</option>
+            <option value="gpt3">GPT-3 (OpenAI)</option>
+        </select>
         <input type="button" value="Submit step 2" onclick="submit2()" />
         <br/>
         <textarea cols="80" rows="10" id="response2"></textarea>

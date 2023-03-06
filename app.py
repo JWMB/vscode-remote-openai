@@ -6,6 +6,7 @@ import re
 from bs4 import BeautifulSoup
 import json
 import os
+import openai
 # https://dagster.io/blog/chatgpt-langchain
 # TODO: how can we make these install automatically?
 # pip install langchain==0.0.55 requests openai transformers faiss-cpu
@@ -14,9 +15,10 @@ from langchain.llms import OpenAI, AzureOpenAI
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.docstore.document import Document
 
-os.environ["OPENAI_API_TYPE"] = "azure"
-os.environ["OPENAI_API_VERSION"] = "2022-12-01"
-os.environ["OPENAI_API_BASE"] = "https://open-ai-ace-test.openai.azure.com"
+# os.environ["OPENAI_API_TYPE"] = "azure"
+# os.environ["OPENAI_API_VERSION"] = "2022-12-01"
+# os.environ["OPENAI_API_BASE"] = "https://open-ai-ace-test.openai.azure.com"
+
 # The API key for your Azure OpenAI resource.  You can find this in the Azure portal under your Azure OpenAI resource.
 #export OPENAI_API_KEY=<your Azure OpenAI API key>
 
@@ -54,7 +56,7 @@ def getRelevantSources(phrase, interfaceBaseUrl, categories):
     totalLen = 0
     sources = []
     for match in x.json()["Matches"]:
-        print(match["Title"])
+        # print(match["Title"])
         relativeUrl = match["RelativeUrl"]
         rx = re.search("^\d+", relativeUrl) 
         id = rx.group(0)
@@ -67,6 +69,7 @@ def getRelevantSources(phrase, interfaceBaseUrl, categories):
         else:
             sources.append(
                 {
+                    "title": article["title"],
                     "content": content,
                     "metadata": article["metadata"]
                 }
@@ -132,7 +135,31 @@ def openAiCompletion(question, sources, apiKey, modelName, temperature = 0):
 #sources = getRelevantSources("Where is my latest invoice?", interfaceBaseUrl, categories)
 #answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
 
+def askChatGpt(rPrompt, sources, apiKey, modelName="gpt-3.5-turbo", temperature=1.0):
+    openai.api_key=apiKey
+    messages = []
+    messages.append({"role": "system", "content": "You are a helpful assistant."})
 
+    # messages.append({"role": "user", "content": "Who won the world series in 2020?"})
+    # messages.append({"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."})
+
+    for x in sources:
+        messages.append({"role": "user", "content": x["title"]})
+        messages.append({"role": "assistant", "content": x["content"]})
+
+    messages.append({"role": "user", "content": rPrompt})
+
+    chatGpt = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,
+        temperature=temperature
+    )
+    print("Usage", chatGpt["usage"]["total_tokens"])
+    return chatGpt["choices"][0]["message"]["content"]
+
+# chatAnswer = askChatGpt("What is a guide?", 
+#            [{"title": "Guide meaning", "content": "The Guide will accompany you in your journeys and show how things are done"}],
+#              "sk-...")
 
 app = Flask(__name__)
 
@@ -165,6 +192,7 @@ def step2():
 
     rPrompt = request.args.get("prompt")
     apiKey = request.args.get("openAiApiKey")
+    #azureApiKey = request.args.get("azureOpenAiApiKey")
     modelName = request.args.get("modelName")
     temperature = request.args.get("temperature")
     answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
@@ -172,3 +200,15 @@ def step2():
     response.mimetype = "text/plain"
     return response
 
+@app.route("/stepChatGpt", methods = ['POST'])
+def stepChatGpt():
+    sources = request.json
+
+    rPrompt = request.args.get("prompt")
+    apiKey = request.args.get("openAiApiKey")
+    modelName = request.args.get("modelName")
+    temperature = request.args.get("temperature")
+    answer = askChatGpt(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
+    response = make_response(answer, 200)
+    response.mimetype = "text/plain"
+    return response
