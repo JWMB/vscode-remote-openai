@@ -2,13 +2,13 @@
     <head>
         <title>VS Code Rocks!</title>
         <script>
-            function submit() {
-                fetch("/prompt?" + new URLSearchParams({
+            function submit1() {
+                fetch("/step1?" + new URLSearchParams({
                     prompt: document.getElementById("prompt").value,
                     interfaceBaseUrl: document.getElementById("interfaceBaseUrl").value,
-                    modelName: document.getElementById("modelName").value,
-                    openAiApiKey: document.getElementById("openAiApiKey").value,
-                    temperature: document.getElementById("temperature").value,
+                    // modelName: document.getElementById("modelName").value,
+                    // openAiApiKey: document.getElementById("openAiApiKey").value,
+                    // temperature: document.getElementById("temperature").value,
                     categories: document.getElementById("categories").value,
                 }))
                 .then(r => { 
@@ -17,6 +17,26 @@
                 })
                 .catch(err => console.error(err))
             }
+            function submit2() {
+                fetch("/step2?" + new URLSearchParams({
+                    prompt: document.getElementById("prompt").value,
+                    // interfaceBaseUrl: document.getElementById("interfaceBaseUrl").value,
+                    modelName: document.getElementById("modelName").value,
+                    openAiApiKey: document.getElementById("openAiApiKey").value,
+                    temperature: document.getElementById("temperature").value,
+                    // categories: document.getElementById("categories").value,
+                }), { 
+                    method: "POST", 
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json'},
+                    body: document.getElementById('response').value
+                 })
+                .then(r => { 
+                    console.log(r);
+                    r.text().then(txt => document.getElementById('response2').value = txt)
+                })
+                .catch(err => console.error(err))
+            }
+
         </script>
     </head>
     <body>
@@ -32,8 +52,12 @@
         <br/>
         <input id="prompt" type="text" value="What is a guide?" /> Prompt
         <br/>
-        <input type="button" value="Submit" onclick="submit()" />
+        <input type="button" value="Submit step 1" onclick="submit1()" />
         <br/>
         <textarea cols="80" rows="10" id="response"></textarea>
+        <br/>
+        <input type="button" value="Submit step 2" onclick="submit2()" />
+        <br/>
+        <textarea cols="80" rows="10" id="response2"></textarea>
     </body>
 </html>

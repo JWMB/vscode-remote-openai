@@ -65,11 +65,16 @@ def getRelevantSources(phrase, interfaceBaseUrl, categories):
         if totalLen > 4000 / 1.1:
             break
         else:
-            sources.append(Document(
-                page_content=content,
-                metadata=article["metadata"]
+            sources.append(
+                {
+                    "content": content,
+                    "metadata": article["metadata"]
+                }
+                # Document(
+                #     page_content=content,
+                #     metadata=article["metadata"]
+                # )
             )
-    )
     return sources
 
 def azureOpenAiCompletion(prompt, api_key, temperature = 0):
@@ -99,9 +104,10 @@ def azureOpenAiCompletion(prompt, api_key, temperature = 0):
     return response["choices"][0]["text"]
 
 def openAiCompletion(question, sources, apiKey, modelName, temperature = 0):
+    # https://langchain.readthedocs.io/en/latest/modules/llms/integrations/azure_openai_example.html
     chain = load_qa_with_sources_chain(
-        # AzureOpenAI(model_name=modelName, temperature=temperature, openai_api_key=apiKey)
-        OpenAI(temperature=temperature, openai_api_key=apiKey, model_name=modelName)
+        AzureOpenAI(deployment_name=modelName, model_name="text-davinci-003", temperature=temperature, openai_api_key=apiKey)
+        # OpenAI(temperature=temperature, openai_api_key=apiKey, model_name=modelName)
         # "text-davinci-003" # https://platform.openai.com/docs/models
         # max_tokens=256 # sets an upper bound on how many tokens the API will return
     ) #, chain_type="map_reduce")
@@ -134,21 +140,35 @@ app = Flask(__name__)
 def hello():
     return app.send_static_file("index.html")
 
-@app.route("/prompt")
+@app.route("/step1")
 def prompt():
     rPrompt = request.args.get("prompt")
-    modelName = request.args.get("modelName")
     interfaceBaseUrl = request.args.get("interfaceBaseUrl")
-    apiKey = request.args.get("openAiApiKey")
-    temperature = request.args.get("temperature")
     categories = request.args.get("categories")
     if not(rPrompt is None) and len(rPrompt):
         sources = getRelevantSources(rPrompt, interfaceBaseUrl, categories)
-        answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
         # answer = createAnswer(rPrompt, apiKey, modelName, interfaceBaseUrl, categories, float(temperature))
-        response = make_response(answer, 200)
+        #xxx = list(map(lambda src: { content : src.page_content, metadata : src.metadata }, sources))
+        # page_content=content, metadata=article["metadata"]
+
+        asJson = json.dumps(sources)
+        response = make_response(asJson, 200)
     else:
         response = make_response("prompt parameter empty", 200)
 
+    response.mimetype = "application/json"
+    return response
+
+@app.route("/step2", methods = ['POST'])
+def step2():
+    sources = list(map(lambda x: Document(page_content=x["content"], metadata=x["metadata"]), request.json))
+
+    rPrompt = request.args.get("prompt")
+    apiKey = request.args.get("openAiApiKey")
+    modelName = request.args.get("modelName")
+    temperature = request.args.get("temperature")
+    answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
+    response = make_response(answer, 200)
     response.mimetype = "text/plain"
     return response
+
