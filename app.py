@@ -4,14 +4,21 @@ import urllib.parse
 import requests
 import re
 from bs4 import BeautifulSoup
-
+import json
+import os
 # https://dagster.io/blog/chatgpt-langchain
 # TODO: how can we make these install automatically?
 # pip install langchain==0.0.55 requests openai transformers faiss-cpu
 
-from langchain.llms import OpenAI
+from langchain.llms import OpenAI, AzureOpenAI
 from langchain.chains.qa_with_sources import load_qa_with_sources_chain
 from langchain.docstore.document import Document
+
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_VERSION"] = "2022-12-01"
+os.environ["OPENAI_API_BASE"] = "https://open-ai-ace-test.openai.azure.com"
+# The API key for your Azure OpenAI resource.  You can find this in the Azure portal under your Azure OpenAI resource.
+#export OPENAI_API_KEY=<your Azure OpenAI API key>
 
 def constructUrl(baseUrl, path, categories=""):
     clientId = "c196d990-f964-457f-5690-552e7a52600c"
@@ -65,12 +72,37 @@ def getRelevantSources(phrase, interfaceBaseUrl, categories):
     )
     return sources
 
-def createAnswer(question, openAiApiKey, modelName, interfaceBaseUrl, categories, temperature):
-    sources = getRelevantSources(question, interfaceBaseUrl, categories)
+def azureOpenAiCompletion(prompt, api_key, temperature = 0):
+    base_url = "https://open-ai-ace-test.openai.azure.com/"
+    deployment_name ="text-davinci-003-test"
+
+    url = base_url + "/openai/deployments/" + deployment_name + "/completions?api-version=2022-12-01"
+    # https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
+    payload = {
+        "prompt":prompt,
+        "temperature": temperature,
+        "max_tokens": 40
+    }
+
+    r = requests.post(url, 
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json"
+        },
+        json = payload
+    )
+
+    response = json.loads(r.text)
+    formatted_response = json.dumps(response, indent=4)
+    print(formatted_response)
+
+    return response["choices"][0]["text"]
+
+def openAiCompletion(question, sources, apiKey, modelName, temperature = 0):
     chain = load_qa_with_sources_chain(
-        OpenAI(temperature=temperature, openai_api_key=openAiApiKey,
-        model_name=modelName # "text-davinci-003" # https://platform.openai.com/docs/models
-        )
+        # AzureOpenAI(model_name=modelName, temperature=temperature, openai_api_key=apiKey)
+        OpenAI(temperature=temperature, openai_api_key=apiKey, model_name=modelName)
+        # "text-davinci-003" # https://platform.openai.com/docs/models
         # max_tokens=256 # sets an upper bound on how many tokens the API will return
     ) #, chain_type="map_reduce")
     
@@ -85,6 +117,16 @@ def createAnswer(question, openAiApiKey, modelName, interfaceBaseUrl, categories
     except Exception as e:
         return str(e)
 
+# def createAnswer(question, apiKey, modelName, interfaceBaseUrl, categories, temperature):
+#     sources = getRelevantSources(question, interfaceBaseUrl, categories)
+
+
+##result = azureOpenAiCompletion("What happened to Elmo?", "a2a5db8d23324cb6a937e8ab119be9ca", 0.5)
+##print(result)
+#sources = getRelevantSources("Where is my latest invoice?", interfaceBaseUrl, categories)
+#answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
+
+
 
 app = Flask(__name__)
 
@@ -97,11 +139,13 @@ def prompt():
     rPrompt = request.args.get("prompt")
     modelName = request.args.get("modelName")
     interfaceBaseUrl = request.args.get("interfaceBaseUrl")
-    openAiApiKey = request.args.get("openAiApiKey")
+    apiKey = request.args.get("openAiApiKey")
     temperature = request.args.get("temperature")
     categories = request.args.get("categories")
     if not(rPrompt is None) and len(rPrompt):
-        answer = createAnswer(rPrompt, openAiApiKey, modelName, interfaceBaseUrl, categories, float(temperature))
+        sources = getRelevantSources(rPrompt, interfaceBaseUrl, categories)
+        answer = openAiCompletion(rPrompt, sources, apiKey, modelName, float(temperature)) #"text-davinci-003"
+        # answer = createAnswer(rPrompt, apiKey, modelName, interfaceBaseUrl, categories, float(temperature))
         response = make_response(answer, 200)
     else:
         response = make_response("prompt parameter empty", 200)
